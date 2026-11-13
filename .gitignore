@@ -1,0 +1,25 @@
+# Dependencies
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+node_modules/
+
+# Environment secrets (NEVER commit real keys)
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker volumes & logs
+falkordb_data/
+mcp_logs/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# UV lock (large, auto-generated)
+uv.lock

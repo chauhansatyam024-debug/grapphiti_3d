@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graphiti 3D Knowledge Graph Visualizer</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- 3D Force Graph & Three.js Libraries -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
+  <script src="https://unpkg.com/three-spritetext@1.8.2/dist/three-spritetext.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: #030712;
+      color: #f1f5f9;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #3d-graph {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Glassmorphic Header overlay */
+    .header-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 18px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-width: 380px;
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-title .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 12px #38bdf8;
+    }
+    .header-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* Floating Control Panel */
+    .controls-panel {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 30px;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover {
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      border-color: transparent;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(56, 189, 248, 0.4);
+    }
+    .btn.active {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      border-color: transparent;
+    }
+
+    /* Right Details Inspector Drawer */
+    .inspector-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      width: 340px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .node-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      width: fit-content;
+    }
+    .node-summary {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .fact-box {
+      font-size: 12px;
+      color: #a7f3d0;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 10px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Legend */
+    .legend {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .legend-line {
+      width: 16px;
+      height: 3px;
+      border-radius: 2px;
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-panel">
+    <div class="header-title">
+      <div class="dot"></div>
+      Graphiti 3D Blue Stick Graph
+    </div>
+    <div class="header-subtitle">
+      Futuristic 3D WebGL Graph • Solid Blue Sticks • Clean Spacing
+    </div>
+  </div>
+
+  <div class="controls-panel">
+    <button class="btn" id="btn-rotate" onclick="toggleAutoRotate()">
+      🌐 Auto Rotate
+    </button>
+    <button class="btn" onclick="resetCamera()">
+      🎯 Reset View
+    </button>
+    <button class="btn" onclick="fetchGraphData()">
+      🔄 Refresh Graph
+    </button>
+  </div>
+
+  <div class="inspector-panel" id="inspector">
+    <div class="badge" id="insp-badge">ENTITY</div>
+    <div class="node-title" id="insp-title">Node Name</div>
+    <div class="node-summary" id="insp-summary">Click on any node in 3D space to inspect properties and memory summaries.</div>
+    <div class="fact-box" id="insp-fact">Relationship facts will appear here.</div>
+  </div>
+
+  <div class="legend">
+    <div style="font-weight: 700; margin-bottom: 4px; color: #94a3b8;">GRAPH ELEMENTS</div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #c084fc; box-shadow: 0 0 8px #c084fc;"></div>
+      <span>AI Agents (Antigravity / VS Code)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></div>
+      <span>Projects (AlgoAdvisor / Images-to-PDF)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-line"></div>
+      <span>Simple Blue Sticks (Relationships)</span>
+    </div>
+  </div>
+
+  <div id="3d-graph"></div>
+
+  <script>
+    let graphInstance = null;
+    let isAutoRotating = false;
+    const FIXED_NODE_RADIUS = 7; // Fixed uniform size for all nodes!
+
+    // Color Palette
+    function getNodeColor(node) {
+      if (node.id === "Antigravity" || node.id === "VS Code Agent") return "#c084fc"; // Neon Purple
+      if (node.id === "AlgoAdvisor" || node.id === "Images to PDF (pdf_maker)") return "#38bdf8"; // Neon Electric Cyan
+      return "#34d399"; // Neon Emerald
+    }
+
+    function initGraph() {
+      const elem = document.getElementById('3d-graph');
+      
+      graphInstance = ForceGraph3D()(elem)
+        .backgroundColor('#030712')
+        .showNavInfo(false)
+        .nodeRelSize(FIXED_NODE_RADIUS)
+        .nodeVal(() => 1) // Fixed weight
+        .nodeColor(getNodeColor)
+        
+        // --- 1. FIXED SIZE & ELEGANT 3D SPHERES ---
+        .nodeThreeObject(node => {
+          const group = new THREE.Group();
+          
+          // Core Metallic Sphere
+          const geometry = new THREE.SphereGeometry(FIXED_NODE_RADIUS, 32, 32);
+          const material = new THREE.MeshPhongMaterial({
+            color: getNodeColor(node),
+            emissive: getNodeColor(node),
+            emissiveIntensity: 0.5,
+            shininess: 100,
+            transparent: true,
+            opacity: 0.95
+          });
+          const sphere = new THREE.Mesh(geometry, material);
+          group.add(sphere);
+
+          // Outer Atmosphere Halo Aura
+          const haloGeo = new THREE.SphereGeometry(FIXED_NODE_RADIUS * 1.3, 32, 32);
+          const haloMat = new THREE.MeshBasicMaterial({
+            color: getNodeColor(node),
+            transparent: true,
+            opacity: 0.15,
+            wireframe: false
+          });
+          const halo = new THREE.Mesh(haloGeo, haloMat);
+          group.add(halo);
+
+          // Crisp 3D Text Label positioned neatly above node
+          const sprite = new SpriteText(node.name || node.id);
+          sprite.color = '#ffffff';
+          sprite.backgroundColor = 'rgba(15, 23, 42, 0.75)';
+          sprite.padding = [3, 6];
+          sprite.borderRadius = 6;
+          sprite.textHeight = 4.5;
+          sprite.fontFace = 'Outfit';
+          sprite.fontWeight = 'bold';
+          sprite.position.set(0, FIXED_NODE_RADIUS + 9, 0);
+          group.add(sprite);
+
+          return group;
+        })
+        
+        // --- 2. SIMPLE BLUE STICKS & NO PARTICLES ---
+        .linkWidth(3.0) // Sleek 3D stick thickness
+        .linkResolution(12) // Smooth round 3D stick tube
+        .linkColor(() => '#38bdf8') // Simple solid electric blue stick!
+        .linkDirectionalParticles(0) // REMOVED RUNNING PARTICLES completely!
+        
+        .onNodeClick(node => {
+          // Camera Fly-to transition
+          const distance = 120;
+          const distRatio = 1 + distance / Math.hypot(node.x || 1, node.y || 1, node.z || 1);
+          
+          graphInstance.cameraPosition(
+            { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+            node,
+            1200
+          );
+
+          // Show Inspector
+          const insp = document.getElementById('inspector');
+          insp.style.display = 'flex';
+          document.getElementById('insp-title').innerText = node.name || node.id;
+          document.getElementById('insp-badge').innerText = node.label || 'ENTITY';
+          document.getElementById('insp-summary').innerText = node.summary || 'Extracted graph node memory.';
+          document.getElementById('insp-fact').innerText = `ID: ${node.id}`;
+        })
+        .onLinkClick(link => {
+          const insp = document.getElementById('inspector');
+          insp.style.display = 'flex';
+          document.getElementById('insp-title').innerText = `${link.source.name || link.source} → ${link.target.name || link.target}`;
+          document.getElementById('insp-badge').innerText = link.name || 'RELATES_TO';
+          document.getElementById('insp-summary').innerText = 'Relationship Blue Stick Connection:';
+          document.getElementById('insp-fact').innerText = link.fact || 'Connected relationship edge.';
+        });
+
+      // Lighting setup
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+      graphInstance.scene().add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+      dirLight.position.set(200, 200, 200);
+      graphInstance.scene().add(dirLight);
+
+      fetchGraphData();
+    }
+
+    function fetchGraphData() {
+      fetch('/api/graph')
+        .then(res => res.json())
+        .then(data => {
+          graphInstance.graphData(data);
+          
+          // --- 3. D3 PHYSICS FORCE TUNING: SPREAD NODES APART ---
+          setTimeout(() => {
+            if (graphInstance.d3Force) {
+              graphInstance.d3Force('charge').strength(-650);
+              graphInstance.d3Force('link').distance(160);
+            }
+            graphInstance.zoomToFit(1200, 80);
+          }, 400);
+        })
+        .catch(err => console.error("Error loading 3D graph data:", err));
+    }
+
+    function toggleAutoRotate() {
+      isAutoRotating = !isAutoRotating;
+      const btn = document.getElementById('btn-rotate');
+      if (isAutoRotating) {
+        btn.classList.add('active');
+        graphInstance.controls().autoRotate = true;
+        graphInstance.controls().autoRotateSpeed = 1.5;
+      } else {
+        btn.classList.remove('active');
+        graphInstance.controls().autoRotate = false;
+      }
+    }
+
+    function resetCamera() {
+      graphInstance.zoomToFit(1000, 80);
+    }
+
+    window.addEventListener('load', initGraph);
+  </script>
+</body>
+</html>

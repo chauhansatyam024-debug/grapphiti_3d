@@ -1,0 +1,121 @@
+# Graphiti MCP Server Configuration
+# This file supports environment variable expansion using ${VAR_NAME} or ${VAR_NAME:default_value}
+#
+# IMPORTANT: Set SEMAPHORE_LIMIT environment variable to control episode processing concurrency
+# Default: 10 (suitable for OpenAI Tier 3, mid-tier Anthropic)
+# See README.md "Concurrency and LLM Provider 429 Rate Limit Errors" section for tuning guidance
+
+server:
+  transport: "http"  # Options: stdio, sse (deprecated), http
+  host: "0.0.0.0"
+  port: 8000
+  
+llm:
+  provider: "groq"  # Using Groq free tier
+  model: "openai/gpt-oss-120b"  # Active fast Groq model
+  max_tokens: 4096
+  # Groq doesn't enforce json_schema server-side, so use json_object
+  structured_output_mode: "json_object"
+  
+  providers:
+    openai:
+      api_key: ${OPENAI_API_KEY}
+      api_url: ${OPENAI_API_URL:https://api.openai.com/v1}
+      organization_id: ${OPENAI_ORGANIZATION_ID:}
+      
+    azure_openai:
+      api_key: ${AZURE_OPENAI_API_KEY}
+      api_url: ${AZURE_OPENAI_ENDPOINT}
+      api_version: ${AZURE_OPENAI_API_VERSION:2024-10-21}
+      deployment_name: ${AZURE_OPENAI_DEPLOYMENT}
+      use_azure_ad: ${USE_AZURE_AD:false}
+      
+    anthropic:
+      api_key: ${ANTHROPIC_API_KEY}
+      api_url: ${ANTHROPIC_API_URL:https://api.anthropic.com}
+      max_retries: 3
+      
+    gemini:
+      api_key: ${GOOGLE_API_KEY}
+      project_id: ${GOOGLE_PROJECT_ID:}
+      location: ${GOOGLE_LOCATION:us-central1}
+      
+    groq:
+      api_key: ${GROQ_API_KEY}
+      api_url: ${GROQ_API_URL:https://api.groq.com/openai/v1}
+
+embedder:
+  provider: "gemini"  # Google Gemini embeddings - FREE tier (~100 RPM, no credit card)
+  model: "gemini-embedding-001"  # Latest Gemini embedding model
+  dimensions: 768  # Gemini embedding output dimensions
+  
+  # Other providers kept for reference (all require paid API keys)
+  providers:
+    openai:
+      api_key: ${OPENAI_API_KEY}
+      api_url: ${OPENAI_API_URL:https://api.openai.com/v1}
+      organization_id: ${OPENAI_ORGANIZATION_ID:}
+      
+    gemini:
+      api_key: ${GOOGLE_API_KEY}
+      project_id: ${GOOGLE_PROJECT_ID:}
+      location: ${GOOGLE_LOCATION:us-central1}
+      
+    voyage:
+      api_key: ${VOYAGE_API_KEY}
+      api_url: ${VOYAGE_API_URL:https://api.voyageai.com/v1}
+      model: "voyage-3"
+
+database:
+  provider: "falkordb"  # Default: falkordb. Options: neo4j, falkordb
+
+  providers:
+    falkordb:
+      uri: ${FALKORDB_URI:redis://localhost:6379}
+      password: ${FALKORDB_PASSWORD:}
+      database: ${FALKORDB_DATABASE:default_db}
+
+    neo4j:
+      uri: ${NEO4J_URI:bolt://localhost:7687}
+      username: ${NEO4J_USER:neo4j}
+      password: ${NEO4J_PASSWORD}
+      database: ${NEO4J_DATABASE:neo4j}
+      use_parallel_runtime: ${USE_PARALLEL_RUNTIME:false}
+
+graphiti:
+  group_id: ${GRAPHITI_GROUP_ID:main}
+  episode_id_prefix: ${EPISODE_ID_PREFIX:}
+  user_id: ${USER_ID:mcp_user}
+  entity_types:
+    # --- Built-in entity types ---
+    - name: "Preference"
+      description: "User preferences, choices, opinions, or selections (PRIORITIZE over most other types except User/Assistant)"
+    - name: "Requirement"
+      description: "Specific needs, features, or functionality that must be fulfilled"
+    - name: "Procedure"
+      description: "Standard operating procedures and sequential instructions"
+    - name: "Location"
+      description: "Physical or virtual places where activities occur"
+    - name: "Event"
+      description: "Time-bound activities, occurrences, or experiences"
+    - name: "Organization"
+      description: "Companies, institutions, groups, or formal entities"
+    - name: "Document"
+      description: "Information content in various forms (books, articles, reports, etc.)"
+    - name: "Topic"
+      description: "Subject of conversation, interest, or knowledge domain (use as last resort)"
+    - name: "Person"
+      description: "An individual human referenced in the content"
+    - name: "Object"
+      description: "Physical items, tools, devices, or possessions (use as last resort)"
+    # --- Custom project memory entity types ---
+    - name: "ProjectComponent"
+      description: "A major component or module of the software project (e.g., Backend, Frontend, API, Database Layer, Auth System)"
+    - name: "Task"
+      description: "A unit of work — completed, in-progress, or planned (e.g., 'Implement user auth', 'Fix CORS bug', 'Add pagination')"
+    - name: "Decision"
+      description: "An architectural or design decision with rationale (e.g., 'Chose PostgreSQL over SQLite for concurrent writes')"
+    - name: "Issue"
+      description: "A bug, error, or technical problem encountered during development"
+    - name: "Dependency"
+      description: "An external library, API, service, or tool the project depends on (e.g., Flask, SQLAlchemy, React)"
